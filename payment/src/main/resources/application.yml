@@ -1,0 +1,35 @@
+server:
+  port: 8084
+  servlet:
+    contextPath: /payment
+spring:
+  mvc:
+    locale: en
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/trip_dev
+    username: root
+    password: root
+  devtools:
+    livereload:
+      enabled: true
+    restart:
+      enabled: true
+  jpa:
+    properties:
+      hibernate:
+        ddl-auto: none
+        default_schema: trip_dev
+        dialect: org.hibernate.dialect.MySQL8Dialect
+        format_sql: true
+        show_sql: true
+        type: trace
+        use_sql_comments: true
+    open-in-view: false
+  main:
+    lazy-initialization: false
+  http:
+    encoding:
+      enabled: true
+      force: true
+      charset: UTF-8
