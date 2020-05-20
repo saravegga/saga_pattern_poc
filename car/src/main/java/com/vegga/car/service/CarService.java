@@ -1,11 +1,12 @@
 package com.vegga.car.service;
 
+import com.vegga.car.dto.BookingInput;
 import com.vegga.car.entity.CarReservation;
 import com.vegga.car.repository.CarReservationRepository;
+import com.vegga.car.validator.BookingValidator;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
 
 @Service
 public class CarService {
@@ -16,19 +17,18 @@ public class CarService {
     this.carReservationRepository = carReservationRepository;
   }
 
-  public void save(Long carId, Long clientId, LocalDateTime startDate, LocalDateTime endDate) {
+  public void validateInput(BookingInput input) {
+    BookingValidator.validate(input);
+  }
 
-    CarReservation reservation = new CarReservation();
-    reservation.setCarId(carId);
-    reservation.setClientId(clientId);
-    reservation.setStartDate(startDate);
-    reservation.setEndDate(endDate);
+  public void save(BookingInput input) {
+    CarReservation entity = new CarReservation();
+    BeanUtils.copyProperties(input, entity);
 
-    carReservationRepository.save(reservation);
+    carReservationRepository.save(entity);
   }
 
   public void abortSaving(Long id) {
-
     carReservationRepository.delete(carReservationRepository.getOne(id));
   }
 }

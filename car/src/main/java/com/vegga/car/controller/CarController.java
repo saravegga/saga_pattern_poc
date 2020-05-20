@@ -1,11 +1,9 @@
 package com.vegga.car.controller;
 
+import com.vegga.car.dto.BookingInput;
 import com.vegga.car.service.CarService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
-
-import java.time.LocalDateTime;
 
 @RestController
 public class CarController {
@@ -17,15 +15,19 @@ public class CarController {
     return "Car service is alive";
   }
 
+  @PostMapping(value = "/validate")
+  public String validate(@RequestBody BookingInput input) {
+    try {
+      carService.validateInput(input);
+      return "Ok";
+    } catch (IllegalArgumentException ex) {
+      return "Failed";
+    }
+  }
+
   @PostMapping
-  public String save(
-      @RequestParam(value = "carId") Long carId,
-      @RequestParam(value = "clientId") Long clientId,
-      @RequestParam(value = "startDate") @DateTimeFormat(pattern = "dd.MM.yyyy HH:mm")
-          LocalDateTime startDate,
-      @RequestParam(value = "endDate") @DateTimeFormat(pattern = "dd.MM.yyyy HH:mm")
-          LocalDateTime endDate) {
-    carService.save(carId, clientId, startDate, endDate);
+  public String save(@RequestBody BookingInput input) {
+    carService.save(input);
     return "Saved";
   }
 
