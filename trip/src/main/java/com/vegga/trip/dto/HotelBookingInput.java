@@ -11,10 +11,11 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
-public class CarBookingInput {
+public class HotelBookingInput {
 
   private Long id;
-  private Long carId;
+  private Long hotelId;
+  private Long roomId;
   private Long clientId;
 
   @DateTimeFormat(pattern = "dd.MM.yyyy HH:mm")
