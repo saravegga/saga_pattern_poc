@@ -1,11 +1,21 @@
 package com.vegga.hotel.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vegga.hotel.dto.BookingInput;
+import com.vegga.hotel.dto.MessageOutput;
 import com.vegga.hotel.entity.HotelReservation;
 import com.vegga.hotel.repository.HotelReservationRepository;
+import com.vegga.hotel.validator.BookingValidator;
+import org.springframework.amqp.rabbit.annotation.Exchange;
+import org.springframework.amqp.rabbit.annotation.Queue;
+import org.springframework.amqp.rabbit.annotation.QueueBinding;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class HotelService {
@@ -16,20 +26,51 @@ public class HotelService {
     this.hotelReservationRepository = hotelReservationRepository;
   }
 
-  public void save(Long hotelId, Long roomId, Long clientId, LocalDateTime startDate, LocalDateTime endDate) {
+  @RabbitListener(
+      bindings =
+          @QueueBinding(
+              value = @Queue(value = "hotel.booking.validate.rpc.requests"),
+              exchange = @Exchange(value = "hotel.booking.rpc"),
+              key = "hotel.booking.validate"))
+  public String validateInput(String input) throws JsonProcessingException {
 
-    HotelReservation reservation = new HotelReservation();
-    reservation.setHotelId(hotelId);
-    reservation.setRoomId(roomId);
-    reservation.setClientId(clientId);
-    reservation.setStartDate(startDate);
-    reservation.setEndDate(endDate);
+    BookingInput bookingInput = new ObjectMapper().readValue(input, BookingInput.class);
+    List<String> errors = BookingValidator.validate(bookingInput);
 
-    hotelReservationRepository.save(reservation);
+    return new ObjectMapper()
+        .writeValueAsString(new MessageOutput(bookingInput.getTransactionalId(), null, errors));
   }
 
-  public void abortSaving(Long id) {
+  @RabbitListener(
+      bindings =
+          @QueueBinding(
+              value = @Queue(value = "hotel.booking.rpc.requests"),
+              exchange = @Exchange(value = "hotel.booking.rpc"),
+              key = "hotel.booking"))
+  public String save(String input) throws JsonProcessingException {
 
-    hotelReservationRepository.delete(hotelReservationRepository.getOne(id));
+    BookingInput bookingInput = new ObjectMapper().readValue(input, BookingInput.class);
+    HotelReservation entity = new HotelReservation();
+    BeanUtils.copyProperties(bookingInput, entity);
+
+    HotelReservation hotelReservation = hotelReservationRepository.save(entity);
+    return new ObjectMapper()
+        .writeValueAsString(
+            new MessageOutput(bookingInput.getTransactionalId(), hotelReservation.getId(), null));
+  }
+
+  @RabbitListener(
+      bindings =
+          @QueueBinding(
+              value = @Queue(value = "abort.hotel.booking.rpc.requests"),
+              exchange = @Exchange(value = "hotel.booking.rpc"),
+              key = "abort.hotel.booking"))
+  public String abortSaving(String input) throws JsonProcessingException {
+
+    BookingInput bookingInput = new ObjectMapper().readValue(input, BookingInput.class);
+    hotelReservationRepository.delete(hotelReservationRepository.getOne(bookingInput.getId()));
+
+    return new ObjectMapper()
+        .writeValueAsString(new MessageOutput(bookingInput.getTransactionalId(), null, null));
   }
 }
