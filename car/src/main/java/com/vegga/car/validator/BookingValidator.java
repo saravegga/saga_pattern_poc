@@ -2,11 +2,19 @@ package com.vegga.car.validator;
 
 import com.vegga.car.dto.BookingInput;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class BookingValidator {
 
-  public static void validate(BookingInput input) {
+  public static List<String> validate(BookingInput input) {
+
+    List<String> errors = new ArrayList<>();
+
     if (input.getCarId() == 34L) { // random invalid number just for the sake of validation
-      throw new IllegalArgumentException("This carId does not exist.");
+      errors.add("This carId does not exist.");
     }
+
+    return errors;
   }
 }
