@@ -14,12 +14,12 @@ This service has the purpose to orchestrate the core services. First of all, it 
 http://localhost:8080/trip/swagger-ui.html
 
 # Core Services
-Airline Service: To fail the validation, just use the code 34 in the flightId field.
-Car Service: To fail the validation, just use the code 34 in the carId field.
-Hotel Service: To fail the validation, just use the code 34 in the hotelId field.
-Payment Service: To fail the validation, just use the code 34 in the airlineReservationId field.
+* Airline Service: To fail the validation, just use the code 34 in the flightId field.
+* Car Service: To fail the validation, just use the code 34 in the carId field.
+* Hotel Service: To fail the validation, just use the code 34 in the hotelId field.
+* Payment Service: To fail the validation, just use the code 34 in the airlineReservationId field.
 
-To fail the whole transaction, just use the code 34 in the clientId of the PaymentInput field.
+* To fail the whole transaction, just use the code 34 in the clientId of the PaymentInput field.
 
 # Eventstore
 This service listens to the changing events and save in a MongoDB. It also has the responsability of retrieving the last state of some entity when it needs to be undone.
