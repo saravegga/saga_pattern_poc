@@ -1,0 +1,23 @@
+server:
+  port: 8070
+  servlet:
+    contextPath: /eventstore
+spring:
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/eventstorelogging
+  main:
+    lazy-initialization: false
+  http:
+    encoding:
+      enabled: true
+      force: true
+      charset: UTF-8
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+logging:
+  level:
+    root: info
