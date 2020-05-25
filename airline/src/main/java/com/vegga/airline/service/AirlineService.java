@@ -1,7 +1,10 @@
 package com.vegga.airline.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vegga.airline.dto.AbortDTO;
+import com.vegga.airline.dto.BaseDTO;
 import com.vegga.airline.dto.BookingInput;
 import com.vegga.airline.dto.MessageOutput;
 import com.vegga.airline.entity.AirlineReservation;
@@ -34,8 +37,9 @@ public class AirlineService {
               key = "airline.booking.validate"))
   public String validateInput(String input) throws JsonProcessingException {
 
-    BookingInput bookingInput = new ObjectMapper().readValue(input, BookingInput.class);
-    List<String> errors = BookingValidator.validate(bookingInput);
+    BaseDTO<BookingInput> bookingInput =
+        new ObjectMapper().readValue(input, new TypeReference<>() {});
+    List<String> errors = BookingValidator.validate(bookingInput.getEntity());
 
     return new ObjectMapper()
         .writeValueAsString(new MessageOutput(bookingInput.getTransactionalId(), null, errors));
@@ -46,12 +50,14 @@ public class AirlineService {
           @QueueBinding(
               value = @Queue(value = "airline.booking.rpc.requests"),
               exchange = @Exchange(value = "airline.booking.rpc"),
-              key = "airline.booking"))
+              key = "airline.booking"),
+      priority = "10")
   public String save(String input) throws JsonProcessingException {
 
-    BookingInput bookingInput = new ObjectMapper().readValue(input, BookingInput.class);
+    BaseDTO<BookingInput> bookingInput =
+        new ObjectMapper().readValue(input, new TypeReference<>() {});
     AirlineReservation entity = new AirlineReservation();
-    BeanUtils.copyProperties(bookingInput, entity);
+    BeanUtils.copyProperties(bookingInput.getEntity(), entity);
 
     AirlineReservation airlineReservation = airlineReservationRepository.save(entity);
     return new ObjectMapper()
@@ -65,12 +71,24 @@ public class AirlineService {
               value = @Queue(value = "abort.airline.booking.rpc.requests"),
               exchange = @Exchange(value = "airline.booking.rpc"),
               key = "abort.airline.booking"))
-  public String abortSaving(String input) throws JsonProcessingException {
+  public void abortSaving(String input) throws JsonProcessingException {
 
-    BookingInput bookingInput = new ObjectMapper().readValue(input, BookingInput.class);
-    airlineReservationRepository.delete(airlineReservationRepository.getOne(bookingInput.getId()));
+    AbortDTO<BookingInput> bookingInput =
+        new ObjectMapper().readValue(input, new TypeReference<>() {});
 
-    return new ObjectMapper()
-        .writeValueAsString(new MessageOutput(bookingInput.getTransactionalId(), null, null));
+    if (bookingInput.getBefore() == null
+        || bookingInput.getBefore().getEntity() == null
+        || bookingInput.getBefore().getEntity().getId() == null
+        || bookingInput.getBefore().getEntity().getId() == 0L) {
+
+      airlineReservationRepository.delete(
+              airlineReservationRepository.getOne(bookingInput.getThen().getEntity().getId()));
+
+    } else {
+      AirlineReservation entity = new AirlineReservation();
+      BeanUtils.copyProperties(bookingInput.getBefore().getEntity(), entity);
+      airlineReservationRepository.save(entity);
+    }
+
   }
 }
