@@ -1,7 +1,9 @@
 package com.vegga.payment.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vegga.payment.dto.BaseDTO;
 import com.vegga.payment.dto.BookingInput;
 import com.vegga.payment.dto.MessageOutput;
 import com.vegga.payment.entity.Payment;
@@ -33,8 +35,9 @@ public class PaymentService {
               exchange = @Exchange(value = "payment.rpc"),
               key = "payment.validate"))
   public String validateInput(String input) throws JsonProcessingException {
-    BookingInput bookingInput = new ObjectMapper().readValue(input, BookingInput.class);
-    List<String> errors = BookingValidator.validate(bookingInput);
+    BaseDTO<BookingInput> bookingInput =
+        new ObjectMapper().readValue(input, new TypeReference<>() {});
+    List<String> errors = BookingValidator.validate(bookingInput.getEntity());
 
     return new ObjectMapper()
         .writeValueAsString(new MessageOutput(bookingInput.getTransactionalId(), null, errors));
@@ -45,31 +48,25 @@ public class PaymentService {
           @QueueBinding(
               value = @Queue(value = "payment.rpc.requests"),
               exchange = @Exchange(value = "payment.rpc"),
-              key = "payment"))
+              key = "payment"),
+      priority = "10")
   public String save(String input) throws JsonProcessingException {
 
-    BookingInput bookingInput = new ObjectMapper().readValue(input, BookingInput.class);
+    BaseDTO<BookingInput> bookingInput =
+        new ObjectMapper().readValue(input, new TypeReference<>() {});
     Payment entity = new Payment();
-    BeanUtils.copyProperties(bookingInput, entity);
+    BeanUtils.copyProperties(bookingInput.getEntity(), entity);
+
+    if (bookingInput.getEntity().getClientId() == 34L) {
+
+      return new ObjectMapper()
+              .writeValueAsString(
+                      new MessageOutput(bookingInput.getTransactionalId(), null, List.of("This client does not have balance.")));
+    }
 
     Payment payment = paymentRepository.save(entity);
     return new ObjectMapper()
         .writeValueAsString(
             new MessageOutput(bookingInput.getTransactionalId(), payment.getId(), null));
-  }
-
-  @RabbitListener(
-      bindings =
-          @QueueBinding(
-              value = @Queue(value = "abort.payment.rpc.requests"),
-              exchange = @Exchange(value = "payment.rpc"),
-              key = "abort.payment"))
-  public String abortSaving(String input) throws JsonProcessingException {
-
-    BookingInput bookingInput = new ObjectMapper().readValue(input, BookingInput.class);
-    paymentRepository.delete(paymentRepository.getOne(bookingInput.getId()));
-
-    return new ObjectMapper()
-        .writeValueAsString(new MessageOutput(bookingInput.getTransactionalId(), null, null));
   }
 }
