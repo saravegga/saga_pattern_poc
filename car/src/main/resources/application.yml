@@ -38,7 +38,3 @@ spring:
     port: 5672
     username: guest
     password: guest
-queue:
-  name: messagequeue
-fanout:
-  exchange: messagequeue-exchange
