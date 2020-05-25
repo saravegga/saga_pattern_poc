@@ -2,6 +2,8 @@ package com.vegga.trip.queue;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vegga.trip.dto.AbortDTO;
+import com.vegga.trip.dto.BaseDTO;
 import com.vegga.trip.dto.CarBookingInput;
 import com.vegga.trip.dto.MessageOutput;
 import org.slf4j.Logger;
@@ -19,7 +21,8 @@ public class CarBookingRPCClient {
   @Autowired private RabbitTemplate template;
 
   @Scheduled(fixedDelay = 1000, initialDelay = 500)
-  public MessageOutput validateInput(CarBookingInput input) throws JsonProcessingException {
+  public MessageOutput validateInput(BaseDTO<CarBookingInput> input)
+      throws JsonProcessingException {
     logger.info("[x] Requesting car booking validate({})", input);
     String tmp =
         (String)
@@ -33,7 +36,7 @@ public class CarBookingRPCClient {
   }
 
   @Scheduled(fixedDelay = 1000, initialDelay = 500)
-  public MessageOutput save(CarBookingInput input) throws JsonProcessingException {
+  public MessageOutput save(BaseDTO<CarBookingInput> input) throws JsonProcessingException {
     logger.info("[x] Requesting car booking({})", input);
     String tmp =
         (String)
@@ -44,8 +47,10 @@ public class CarBookingRPCClient {
     return response;
   }
 
-  // rollback insert method
-
-  // rollback update method
-
+  @Scheduled(fixedDelay = 1000, initialDelay = 500)
+  public void abort(AbortDTO<CarBookingInput> input) throws JsonProcessingException {
+    logger.info("[x] Requested abort car booking({})", input);
+    template.convertAndSend(
+        "car.booking.rpc", "abort.car.booking", new ObjectMapper().writeValueAsString(input));
+  }
 }

@@ -1,12 +1,7 @@
 package com.vegga.trip.controller;
 
-import com.vegga.trip.dto.MessageOutput;
-import com.vegga.trip.dto.PaymentBookingInput;
-import com.vegga.trip.dto.TripInput;
-import com.vegga.trip.queue.AirlineBookingRPCClient;
-import com.vegga.trip.queue.CarBookingRPCClient;
-import com.vegga.trip.queue.HotelBookingRPCClient;
-import com.vegga.trip.queue.PaymentRPCClient;
+import com.vegga.trip.dto.*;
+import com.vegga.trip.queue.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +10,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 
 @RestController
 public class TripController {
@@ -27,6 +26,8 @@ public class TripController {
 
   @Autowired PaymentRPCClient paymentRPCClient;
 
+  @Autowired EventstoreClient eventstoreClient;
+
   @GetMapping(value = "/check")
   public String check() {
     return "Trip service is alive";
@@ -34,54 +35,109 @@ public class TripController {
 
   @PostMapping
   public ResponseEntity createBooking(@RequestBody TripInput input) throws Exception {
-    MessageOutput validateAirline =
-        airlineBookingRPCClient.validateInput(input.getAirlineBooking());
-    MessageOutput validateCar = carBookingRPCClient.validateInput(input.getCarBooking());
-    MessageOutput validateHotel = hotelBookingRPCClient.validateInput(input.getHotelBooking());
-    MessageOutput validatePayment = paymentRPCClient.validateInput(input.getPayment());
+
+    // Current transactionalId
+    UUID transactionalId = UUID.randomUUID();
+
+    // Converting the inputs into BaseDTO<T>
+    BaseDTO<AirlineBookingInput> airlineInput =
+        AirlineBookingInput.convert(input.getAirlineBooking(), transactionalId);
+    BaseDTO<CarBookingInput> carInput =
+        CarBookingInput.convert(input.getCarBooking(), transactionalId);
+    BaseDTO<HotelBookingInput> hotelInput =
+        HotelBookingInput.convert(input.getHotelBooking(), transactionalId);
+    BaseDTO<PaymentBookingInput> paymentInput =
+        PaymentBookingInput.convert(input.getPayment(), transactionalId);
+
+    // Validations
+    MessageOutput validateAirline = airlineBookingRPCClient.validateInput(airlineInput);
+    MessageOutput validateCar = carBookingRPCClient.validateInput(carInput);
+    MessageOutput validateHotel = hotelBookingRPCClient.validateInput(hotelInput);
+    MessageOutput validatePayment = paymentRPCClient.validateInput(paymentInput);
 
     if (hasError(validateAirline)
         || hasError(validateCar)
         || hasError(validateHotel)
         || hasError(validatePayment)) {
-      return new ResponseEntity(HttpStatus.BAD_REQUEST);
+      return new ResponseEntity(
+          appendErrors(validateAirline, validateCar, validateHotel, validatePayment),
+          HttpStatus.BAD_REQUEST);
     }
 
-    MessageOutput saveAirline = airlineBookingRPCClient.save(input.getAirlineBooking());
+    // Saving the values
+    MessageOutput saveAirline = airlineBookingRPCClient.save(airlineInput);
     if (hasError(saveAirline)) {
-      // error
+      // Error
+      return new ResponseEntity(saveAirline, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    MessageOutput saveCar = carBookingRPCClient.save(input.getCarBooking());
+    MessageOutput saveCar = carBookingRPCClient.save(carInput);
     if (hasError(saveCar)) {
-      // rollback airline
-      // error
+      // Error + Compensating transactions
+      BaseDTO<AirlineBookingInput> airlineBefore = eventstoreClient.getEventLog(airlineInput);
+      airlineBookingRPCClient.abort(
+          AirlineBookingInput.createAbortMessage(airlineBefore, airlineInput, saveAirline.getObjectId()));
+      return new ResponseEntity(saveCar, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    MessageOutput saveHotel = hotelBookingRPCClient.save(input.getHotelBooking());
+    MessageOutput saveHotel = hotelBookingRPCClient.save(hotelInput);
     if (hasError(saveHotel)) {
-      // rollback airline
-      // rollback car
-      // error
+      // Error + Compensating transactions
+      BaseDTO<AirlineBookingInput> airlineBefore = eventstoreClient.getEventLog(airlineInput);
+      airlineBookingRPCClient.abort(
+          AirlineBookingInput.createAbortMessage(airlineBefore, airlineInput, saveAirline.getObjectId()));
+      BaseDTO<CarBookingInput> carBefore = eventstoreClient.getEventLog(carInput);
+      carBookingRPCClient.abort(
+          CarBookingInput.createAbortMessage(carBefore, carInput, saveCar.getObjectId()));
+      return new ResponseEntity(saveHotel, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    includeIds(
+    includeIdsIntoPayment(
         input.getPayment(),
         saveAirline.getObjectId(),
         saveCar.getObjectId(),
         saveHotel.getObjectId());
-    MessageOutput savePayment = paymentRPCClient.save(input.getPayment());
+    MessageOutput savePayment = paymentRPCClient.save(paymentInput);
     if (hasError(savePayment)) {
-      // rollback airline
-      // rollback car
-      // rollback hotel
-      // error
+      // Error + Compensating transactions
+      BaseDTO<AirlineBookingInput> airlineBefore = eventstoreClient.getEventLog(airlineInput);
+      airlineBookingRPCClient.abort(
+          AirlineBookingInput.createAbortMessage(airlineBefore, airlineInput, saveAirline.getObjectId()));
+      BaseDTO<CarBookingInput> carBefore = eventstoreClient.getEventLog(carInput);
+      carBookingRPCClient.abort(
+          CarBookingInput.createAbortMessage(carBefore, carInput, saveCar.getObjectId()));
+      BaseDTO<HotelBookingInput> hotelBefore = eventstoreClient.getEventLog(hotelInput);
+      hotelBookingRPCClient.abort(
+          HotelBookingInput.createAbortMessage(hotelBefore, hotelInput, saveHotel.getObjectId()));
+      return new ResponseEntity(savePayment, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
+    // Changing eventstore status to finished and saving the correct ids
+    airlineInput.setObjectId(saveAirline.getObjectId());
+    carInput.setObjectId(saveCar.getObjectId());
+    hotelInput.setObjectId(saveHotel.getObjectId());
+    paymentInput.setObjectId(savePayment.getObjectId());
+    eventstoreClient.finishEventStatus(airlineInput);
+    eventstoreClient.finishEventStatus(carInput);
+    eventstoreClient.finishEventStatus(hotelInput);
+    eventstoreClient.finishEventStatus(paymentInput);
     return new ResponseEntity(HttpStatus.OK);
   }
 
-  private void includeIds(
+  private Object appendErrors(
+      MessageOutput validateAirline,
+      MessageOutput validateCar,
+      MessageOutput validateHotel,
+      MessageOutput validatePayment) {
+    List<String> errors = new ArrayList<>();
+    errors.addAll(validateAirline.getErrors());
+    errors.addAll(validateCar.getErrors());
+    errors.addAll(validateHotel.getErrors());
+    errors.addAll(validatePayment.getErrors());
+    return new MessageOutput(validateAirline.getTransactionalId(), null, errors);
+  }
+
+  private void includeIdsIntoPayment(
       PaymentBookingInput paymentInput,
       Long airlineBookingId,
       Long carBookingId,

@@ -2,7 +2,9 @@ package com.vegga.trip.queue;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vegga.trip.dto.AbortDTO;
 import com.vegga.trip.dto.AirlineBookingInput;
+import com.vegga.trip.dto.BaseDTO;
 import com.vegga.trip.dto.MessageOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,7 +21,8 @@ public class AirlineBookingRPCClient {
   @Autowired private RabbitTemplate template;
 
   @Scheduled(fixedDelay = 1000, initialDelay = 500)
-  public MessageOutput validateInput(AirlineBookingInput input) throws JsonProcessingException {
+  public MessageOutput validateInput(BaseDTO<AirlineBookingInput> input)
+      throws JsonProcessingException {
     logger.info("[x] Requesting airline booking validate({})", input);
     String tmp =
         (String)
@@ -33,7 +36,7 @@ public class AirlineBookingRPCClient {
   }
 
   @Scheduled(fixedDelay = 1000, initialDelay = 500)
-  public MessageOutput save(AirlineBookingInput input) throws JsonProcessingException {
+  public MessageOutput save(BaseDTO<AirlineBookingInput> input) throws JsonProcessingException {
     logger.info("[x] Requesting airline booking({})", input);
     String tmp =
         (String)
@@ -46,8 +49,12 @@ public class AirlineBookingRPCClient {
     return response;
   }
 
-  // rollback insert method
-
-  // rollback update method
-
+  @Scheduled(fixedDelay = 1000, initialDelay = 500)
+  public void abort(AbortDTO<AirlineBookingInput> input) throws JsonProcessingException {
+    logger.info("[x] Requested abort airline booking({})", input);
+    template.convertAndSend(
+        "airline.booking.rpc",
+        "abort.airline.booking",
+        new ObjectMapper().writeValueAsString(input));
+  }
 }

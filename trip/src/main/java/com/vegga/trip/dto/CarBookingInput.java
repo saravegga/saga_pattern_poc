@@ -27,5 +27,15 @@ public class CarBookingInput {
   @JsonSerialize(using = LocalDateTimeSerializer.class)
   private LocalDateTime endDate;
 
-  private UUID transactionalId;
+  public static BaseDTO<CarBookingInput> convert(CarBookingInput input, UUID transactionalId) {
+    return new BaseDTO<>(
+        transactionalId, input.getId(), CarBookingInput.class.getSimpleName(), input);
+  }
+
+  public static AbortDTO<CarBookingInput> createAbortMessage(
+          BaseDTO<CarBookingInput> before, BaseDTO<CarBookingInput> then, Long id) {
+    then.setObjectId(id);
+    then.getEntity().setId(id);
+    return new AbortDTO<>(before, then);
+  }
 }

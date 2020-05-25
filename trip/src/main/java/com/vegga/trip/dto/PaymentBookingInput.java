@@ -34,5 +34,9 @@ public class PaymentBookingInput {
   @JsonSerialize(using = LocalDateTimeSerializer.class)
   private LocalDateTime creationDate;
 
-  private UUID transactionalId;
+  public static BaseDTO<PaymentBookingInput> convert(
+      PaymentBookingInput input, UUID transactionalId) {
+    return new BaseDTO<>(
+        transactionalId, input.getId(), PaymentBookingInput.class.getSimpleName(), input);
+  }
 }

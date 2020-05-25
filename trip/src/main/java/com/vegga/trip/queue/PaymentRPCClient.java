@@ -2,6 +2,7 @@ package com.vegga.trip.queue;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vegga.trip.dto.BaseDTO;
 import com.vegga.trip.dto.MessageOutput;
 import com.vegga.trip.dto.PaymentBookingInput;
 import org.slf4j.Logger;
@@ -19,7 +20,8 @@ public class PaymentRPCClient {
   @Autowired private RabbitTemplate template;
 
   @Scheduled(fixedDelay = 1000, initialDelay = 500)
-  public MessageOutput validateInput(PaymentBookingInput input) throws JsonProcessingException {
+  public MessageOutput validateInput(BaseDTO<PaymentBookingInput> input)
+      throws JsonProcessingException {
     logger.info("[x] Requesting payment validate({})", input);
     String tmp =
         (String)
@@ -31,7 +33,7 @@ public class PaymentRPCClient {
   }
 
   @Scheduled(fixedDelay = 1000, initialDelay = 500)
-  public MessageOutput save(PaymentBookingInput input) throws JsonProcessingException {
+  public MessageOutput save(BaseDTO<PaymentBookingInput> input) throws JsonProcessingException {
     logger.info("[x] Requesting payment({})", input);
     String tmp =
         (String)
@@ -41,9 +43,4 @@ public class PaymentRPCClient {
     logger.info("[.] Got '{}'", response);
     return response;
   }
-
-  // rollback insert method
-
-  // rollback update method
-
 }
