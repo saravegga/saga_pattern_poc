@@ -22,4 +22,4 @@ http://localhost:8080/trip/swagger-ui.html
 * To fail the whole transaction, just use the code 34 in the clientId of the PaymentInput field.
 
 # Eventstore
-This service listens to the changing events and save in a MongoDB. It also has the responsability of retrieving the last state of some entity when it needs to be undone.
+This service listens to the changing events and saves in a MongoDB. It also has the responsability of retrieving the last state of some entity when it needs to be undone.
