@@ -2,6 +2,13 @@
 Simple POC to implement Saga pattern to solve distributed transactions in microservice architecture.
 Uses RabbitMQ to communicate between services. All the changing events are logged in a MongoDB database via Eventstore service. The core services are using MySQL (same database for all of them).
 
+* Java 11
+* Springboot
+* Hibernate
+* RabbitMQ
+* MySQL
+* MongoDB
+
 # Trip Service (Orchestrator)
 This service has the purpose to orchestrate the core services. First of all, it validates all the input data. Then, it starts trying to save in the relational database. If something goes wrong, it calls the compensating transactions that needs to be done at the moment. By the end, in the happy flow, it updates the event log status to finished.
 http://localhost:8080/trip/swagger-ui.html
