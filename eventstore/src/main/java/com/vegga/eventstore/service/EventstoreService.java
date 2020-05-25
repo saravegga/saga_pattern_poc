@@ -85,7 +85,10 @@ public class EventstoreService {
             .first();
 
     BaseDTO response = new BaseDTO();
-    BeanUtils.copyProperties(result.get(), response);
+
+    if (result.isPresent()) {
+      BeanUtils.copyProperties(result.get(), response);
+    }
 
     return new ObjectMapper().writeValueAsString(response);
   }
