@@ -114,6 +114,7 @@ public class EventstoreService {
     Optional<EventLog> eventLog = repository.findOne(example);
 
     eventLog.get().setObjectId(dto.getObjectId());
+    eventLog.get().setEntity(dto.getEntity());
     eventLog.get().setFinished(true);
 
     repository.save(eventLog.get());
