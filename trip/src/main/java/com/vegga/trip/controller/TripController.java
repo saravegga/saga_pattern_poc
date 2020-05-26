@@ -76,7 +76,8 @@ public class TripController {
       // Error + Compensating transactions
       BaseDTO<AirlineBookingInput> airlineBefore = eventstoreClient.getEventLog(airlineInput);
       airlineBookingRPCClient.abort(
-          AirlineBookingInput.createAbortMessage(airlineBefore, airlineInput, saveAirline.getObjectId()));
+          AirlineBookingInput.createAbortMessage(
+              airlineBefore, airlineInput, saveAirline.getObjectId()));
       return new ResponseEntity(saveCar, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
@@ -85,7 +86,8 @@ public class TripController {
       // Error + Compensating transactions
       BaseDTO<AirlineBookingInput> airlineBefore = eventstoreClient.getEventLog(airlineInput);
       airlineBookingRPCClient.abort(
-          AirlineBookingInput.createAbortMessage(airlineBefore, airlineInput, saveAirline.getObjectId()));
+          AirlineBookingInput.createAbortMessage(
+              airlineBefore, airlineInput, saveAirline.getObjectId()));
       BaseDTO<CarBookingInput> carBefore = eventstoreClient.getEventLog(carInput);
       carBookingRPCClient.abort(
           CarBookingInput.createAbortMessage(carBefore, carInput, saveCar.getObjectId()));
@@ -102,7 +104,8 @@ public class TripController {
       // Error + Compensating transactions
       BaseDTO<AirlineBookingInput> airlineBefore = eventstoreClient.getEventLog(airlineInput);
       airlineBookingRPCClient.abort(
-          AirlineBookingInput.createAbortMessage(airlineBefore, airlineInput, saveAirline.getObjectId()));
+          AirlineBookingInput.createAbortMessage(
+              airlineBefore, airlineInput, saveAirline.getObjectId()));
       BaseDTO<CarBookingInput> carBefore = eventstoreClient.getEventLog(carInput);
       carBookingRPCClient.abort(
           CarBookingInput.createAbortMessage(carBefore, carInput, saveCar.getObjectId()));
@@ -113,15 +116,41 @@ public class TripController {
     }
 
     // Changing eventstore status to finished and saving the correct ids
-    airlineInput.setObjectId(saveAirline.getObjectId());
-    carInput.setObjectId(saveCar.getObjectId());
-    hotelInput.setObjectId(saveHotel.getObjectId());
-    paymentInput.setObjectId(savePayment.getObjectId());
+    correctIds(
+        airlineInput,
+        carInput,
+        hotelInput,
+        paymentInput,
+        saveAirline,
+        saveCar,
+        saveHotel,
+        savePayment);
     eventstoreClient.finishEventStatus(airlineInput);
     eventstoreClient.finishEventStatus(carInput);
     eventstoreClient.finishEventStatus(hotelInput);
     eventstoreClient.finishEventStatus(paymentInput);
     return new ResponseEntity(HttpStatus.OK);
+  }
+
+  private void correctIds(
+      BaseDTO<AirlineBookingInput> airlineInput,
+      BaseDTO<CarBookingInput> carInput,
+      BaseDTO<HotelBookingInput> hotelInput,
+      BaseDTO<PaymentBookingInput> paymentInput,
+      MessageOutput saveAirline,
+      MessageOutput saveCar,
+      MessageOutput saveHotel,
+      MessageOutput savePayment) {
+
+    airlineInput.setObjectId(saveAirline.getObjectId());
+    carInput.setObjectId(saveCar.getObjectId());
+    hotelInput.setObjectId(saveHotel.getObjectId());
+    paymentInput.setObjectId(savePayment.getObjectId());
+
+    airlineInput.getEntity().setId(saveAirline.getObjectId());
+    carInput.getEntity().setId(saveCar.getObjectId());
+    hotelInput.getEntity().setId(saveHotel.getObjectId());
+    paymentInput.getEntity().setId(savePayment.getObjectId());
   }
 
   private Object appendErrors(
